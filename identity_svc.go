@@ -73,7 +73,7 @@ func (is *IdentitySvc) middleware(f interface{}) http.HandlerFunc {
 
 	if fReflType.NumIn() > 1 {
 		argExist = true
-		argType = fRefl.Type().In(1)
+		argType = fReflType.In(1)
 		argTypeRefl = reflect.New(argType)
 	}
 
