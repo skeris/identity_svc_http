@@ -88,11 +88,10 @@ func (is *IdentitySvc) middleware(f interface{}) http.HandlerFunc {
 				resp := ErrorResp{
 					Text: err.Error(),
 				}
+				w.WriteHeader(http.StatusInternalServerError)
 				if err := json.NewEncoder(w).Encode(resp); err != nil {
 					panic(err)
 				}
-				w.WriteHeader(http.StatusInternalServerError)
-				panic(err)
 			} else {
 				fResultRefl = fRefl.Call([]reflect.Value{reflect.ValueOf(q.Context()), reflect.ValueOf(arg)})
 			}
@@ -100,11 +99,10 @@ func (is *IdentitySvc) middleware(f interface{}) http.HandlerFunc {
 			fResultRefl = fRefl.Call([]reflect.Value{reflect.ValueOf(q.Context())})
 		}
 
+		w.WriteHeader(fResultRefl[1].Interface().(int))
 		if err := json.NewEncoder(w).Encode(fResultRefl[0].Interface()); err != nil {
 			panic(err)
 		}
-
-		w.WriteHeader(fResultRefl[1].Interface().(int))
 	}
 }
 
@@ -129,7 +127,7 @@ func (is *IdentitySvc) status(ctx context.Context, sess *identity.Session) (*Sta
 	}
 }
 
-func (is *IdentitySvc) start(ctx context.Context, requestData StartReq) (result interface{}, httpStatus int) {
+func (is *IdentitySvc) start(ctx context.Context, requestData StartReq) (interface{}, int) {
 	sess := is.sessionObtain(ctx)
 
 	for k, v := range requestData.Values {
@@ -143,11 +141,9 @@ func (is *IdentitySvc) start(ctx context.Context, requestData StartReq) (result 
 		}, http.StatusInternalServerError
 	}
 
-	result = &StartResp{
+	return &StartResp{
 		Directions: directions,
-	}
-
-	return
+	}, http.StatusOK
 }
 
 func (is *IdentitySvc) Start1(w http.ResponseWriter, q *http.Request) {
