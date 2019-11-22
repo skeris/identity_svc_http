@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"encoding/json"
+	"reflect"
 )
 
 // TODO: Should it handle 'app passwords' concept?
@@ -42,7 +43,7 @@ func New(backend identity.Backend, cookieCtxKey string, identities []identity.Id
 	return is, nil
 }
 
-func (is *IdentitySvc) Register () (public, private *http.ServeMux) {
+func (is *IdentitySvc) Register() (public, private *http.ServeMux) {
 	public = http.NewServeMux()
 	public.HandleFunc("/ListSupportedIdentitiesAndVerifiers", is.ListSupportedIdentitiesAndVerifiers)
 	public.HandleFunc("/CheckStatus", is.CheckStatus)
@@ -51,7 +52,7 @@ func (is *IdentitySvc) Register () (public, private *http.ServeMux) {
 	public.HandleFunc("/StartAttach", is.StartAttach)
 	public.HandleFunc("/CancelAuthentication", is.CancelAuthentication)
 	public.HandleFunc("/ListMyIdentitiesAndVerifiers", is.ListMyIdentitiesAndVerifiers)
-	public.HandleFunc("/Start", is.Start)
+	public.HandleFunc("/Start", is.middleware(is.start))
 	public.HandleFunc("/Verify", is.Verify)
 	public.HandleFunc("/Logout", is.Logout)
 	public.HandleFunc("/UserMerge", is.UserMerge)
@@ -60,6 +61,51 @@ func (is *IdentitySvc) Register () (public, private *http.ServeMux) {
 	private.HandleFunc("/LoginAs", is.LoginAs)
 
 	return
+}
+
+func (is *IdentitySvc) middleware(f interface{}) http.HandlerFunc {
+	fRefl := reflect.ValueOf(f)
+	fReflType := fRefl.Type()
+
+	var argType reflect.Type
+	var argTypeRefl reflect.Value
+	var argExist bool
+
+	if fReflType.NumIn() > 1 {
+		argExist = true
+		argType = fRefl.Type().In(1)
+		argTypeRefl = reflect.New(argType)
+	}
+
+	return func(w http.ResponseWriter, q *http.Request) {
+		q.Header.Set("Content-Type", "application/json")
+
+		var fResultRefl []reflect.Value
+
+		if argExist {
+			arg := argTypeRefl.Interface()
+			if err := json.NewDecoder(q.Body).Decode(&arg); err != nil {
+				resp := ErrorResp{
+					Text: err.Error(),
+				}
+				if err := json.NewEncoder(w).Encode(resp); err != nil {
+					panic(err)
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				panic(err)
+			} else {
+				fResultRefl = fRefl.Call([]reflect.Value{reflect.ValueOf(q.Context()), reflect.ValueOf(arg)})
+			}
+		} else {
+			fResultRefl = fRefl.Call([]reflect.Value{reflect.ValueOf(q.Context())})
+		}
+
+		if err := json.NewEncoder(w).Encode(fResultRefl[0].Interface()); err != nil {
+			panic(err)
+		}
+
+		w.WriteHeader(fResultRefl[1].Interface().(int))
+	}
 }
 
 ////////////////////////////////////////////////////////////////
@@ -83,7 +129,106 @@ func (is *IdentitySvc) status(ctx context.Context, sess *identity.Session) (*Sta
 	}
 }
 
-func (is *IdentitySvc) ListSupportedIdentitiesAndVerifiers(w http.ResponseWriter, q *http.Request) {
+func (is *IdentitySvc) start(ctx context.Context, requestData StartReq) (result interface{}, httpStatus int) {
+	sess := is.sessionObtain(ctx)
+
+	for k, v := range requestData.Values {
+		ctx = context.WithValue(ctx, k, v)
+	}
+
+	directions, err := sess.Start(ctx, requestData.VerifierName, requestData.Args, requestData.IdentityName, requestData.Identity)
+	if err != nil {
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
+	}
+
+	result = &StartResp{
+		Directions: directions,
+	}
+
+	return
+}
+
+func (is *IdentitySvc) Start1(w http.ResponseWriter, q *http.Request) {
+	sess := is.sessionObtain(q.Context())
+
+	var requestData StartReq
+	if err := json.NewDecoder(q.Body).Decode(&requestData); err != nil {
+		q.Header.Set("Content-Type", "text/plain")
+		fmt.Fprint(w, err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		panic(err)
+	}
+
+	ctx := q.Context()
+
+	for k, v := range requestData.Values {
+		ctx = context.WithValue(ctx, k, v)
+	}
+
+	directions, err := sess.Start(ctx, requestData.VerifierName, requestData.Args, requestData.IdentityName, requestData.Identity)
+	if err != nil {
+		q.Header.Set("Content-Type", "text/plain")
+		fmt.Fprintln(w, err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		panic(err)
+	}
+
+	resp := &StartResp{
+		Directions: directions,
+	}
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		q.Header.Set("Content-Type", "text/plain")
+		fmt.Fprintln(w, err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		panic(err)
+	}
+
+	q.Header.Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+}
+
+func (is *IdentitySvc) listSupportedIdentitiesAndVerifiers() (result interface{}, err error) {
+
+	resp := VerifierDetailsResp{}
+
+	idns, vers, err := sess.ListSupportedIdentitiesAndVerifiers()
+	if err != nil {
+		q.Header.Set("Content-Type", "text/plain")
+		fmt.Fprintln(w, err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	for _, idn := range idns {
+		resp.IdentityNames = append(resp.IdentityNames, idn.Name)
+	}
+
+	for _, ver := range vers {
+		resp.Verifiers = append(resp.Verifiers, &VerifierDetails{
+			Name:           ver.Name,
+			IdentityName:   ver.IdentityName,
+			SupportRegular: ver.SupportRegular,
+			SupportReverse: ver.SupportReverse,
+			SupportOAuth2:  ver.SupportOAuth2,
+			SupportStatic:  ver.SupportStatic,
+		})
+	}
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		q.Header.Set("Content-Type", "text/plain")
+		fmt.Fprintln(w, err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		panic(err)
+	}
+
+	q.Header.Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+}
+
+func (is *IdentitySvc) ListSupportedIdentitiesAndVerifiers1(w http.ResponseWriter, q *http.Request) {
 	sess := is.sessionObtain(q.Context())
 	resp := VerifierDetailsResp{}
 
@@ -95,7 +240,7 @@ func (is *IdentitySvc) ListSupportedIdentitiesAndVerifiers(w http.ResponseWriter
 	}
 
 	for _, idn := range idns {
-		resp.IdentitiyNames = append(resp.IdentitiyNames, idn.Name)
+		resp.IdentityNames = append(resp.IdentityNames, idn.Name)
 	}
 
 	for _, ver := range vers {
@@ -290,47 +435,6 @@ func (is *IdentitySvc) ListMyIdentitiesAndVerifiers(w http.ResponseWriter, q *ht
 
 	q.Header.Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-}
-
-func (is *IdentitySvc) Start(w http.ResponseWriter, q *http.Request) {
-	sess := is.sessionObtain(q.Context())
-
-	var requestData StartReq
-	if err := json.NewDecoder(q.Body).Decode(&requestData); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	var ctx context.Context
-
-	for k, v := range requestData.Values {
-		ctx = context.WithValue(q.Context(), k, v)
-	}
-
-	directions, err := sess.Start(ctx, requestData.VerifierName, requestData.Args, requestData.IdentityName, requestData.Identity)
-	if err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	resp := &StartResp{
-		Directions: directions,
-	}
-
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
 }
 
 func (is *IdentitySvc) Verify(w http.ResponseWriter, q *http.Request) {

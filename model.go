@@ -1,8 +1,8 @@
 package identity_svc_http
 
 type VerifierDetailsResp struct {
-	IdentitiyNames []string           `json:"IdentitiyNames"`
-	Verifiers      []*VerifierDetails `json:"Verifiers"`
+	IdentityNames []string           `json:"IdentityNames"`
+	Verifiers     []*VerifierDetails `json:"Verifiers"`
 }
 
 type VerifierDetails struct {
@@ -72,4 +72,8 @@ type LoginAsResp struct {
 	Session string `json:"Session"`
 	User    string `json:"User"`
 	Error   string `json:"Error"`
+}
+
+type ErrorResp struct {
+	Text string `json:"Text"`
 }
