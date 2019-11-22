@@ -21,7 +21,7 @@ type Status struct {
 	Authenticated  *StatusAuthenticated  `json:"Authenticating"`
 }
 type StatusAuthenticating struct {
-	Objective        string  `json:"Objective"`
+	Objective        string                   `json:"Objective"`
 	RemainingFactors int                      `json:"RemainingFactors"`
 	CompletedFactors []StatusCompletedFactors `json:"CompletedFactors"`
 }
@@ -36,40 +36,40 @@ type StatusAuthenticated struct {
 }
 
 type ListMyIdentitiesAndVerifiersResp struct {
-	Identities           []*IdentityData `json:"Identities"`
-	Verifiers            []string        `json:"Verifiers"`
+	Identities []*IdentityData `json:"Identities"`
+	Verifiers  []string        `json:"Verifiers"`
 }
 
 type IdentityData struct {
-	Name                 string   `json:"Name"`
-	Identity             string   `json:"Identity"`
+	Name     string `json:"Name"`
+	Identity string `json:"Identity"`
 }
 
 type StartResp struct {
-	Directions           map[string]string `json:"Directions"`
+	Directions map[string]string `json:"Directions"`
 }
 
 type StartReq struct {
-	VerifierName         string            `json:"VerifierName"`
-	IdentityName         string            `json:"IdentityName"`
-	Identity             string            `json:"Identity"`
-	Args                 map[string]string `json:"Args"`
-	Values               map[string]string `json:"Values"`
+	VerifierName string            `json:"VerifierName"`
+	IdentityName string            `json:"IdentityName"`
+	Identity     string            `json:"Identity"`
+	Args         map[string]string `json:"Args"`
+	Values       map[string]string `json:"Values"`
 }
 
 type VerifyReq struct {
-	VerifierName         string   `json:"VerifierName"`
-	VerificationCode     string   `json:"VerificationCode"`
-	IdentityName         string   `json:"IdentityName"`
-	Identity             string   `json:"Identity"`
+	VerifierName     string `json:"VerifierName"`
+	VerificationCode string `json:"VerificationCode"`
+	IdentityName     string `json:"IdentityName"`
+	Identity         string `json:"Identity"`
 }
 
 type LoginAsReq struct {
-	User                 string   `json:"User"`
+	User string `json:"User"`
 }
 
 type LoginAsResp struct {
-	Session              string   `json:"Session"`
-	User                 string   `json:"User"`
-	Error                string   `json:"Error"`
+	Session string `json:"Session"`
+	User    string `json:"User"`
+	Error   string `json:"Error"`
 }
