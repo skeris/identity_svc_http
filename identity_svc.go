@@ -2,10 +2,8 @@ package identity_svc_http
 
 import (
 	"context"
-	"fmt"
 	"github.com/themakers/identity/cookie"
 	"github.com/themakers/identity/identity"
-	"log"
 	"net/http"
 	"encoding/json"
 	"reflect"
@@ -45,20 +43,20 @@ func New(backend identity.Backend, cookieCtxKey string, identities []identity.Id
 
 func (is *IdentitySvc) Register() (public, private *http.ServeMux) {
 	public = http.NewServeMux()
-	public.HandleFunc("/ListSupportedIdentitiesAndVerifiers", is.ListSupportedIdentitiesAndVerifiers)
-	public.HandleFunc("/CheckStatus", is.CheckStatus)
-	public.HandleFunc("/StartSignIn", is.StartSignIn)
-	public.HandleFunc("/StartSignUp", is.StartSignUp)
-	public.HandleFunc("/StartAttach", is.StartAttach)
-	public.HandleFunc("/CancelAuthentication", is.CancelAuthentication)
-	public.HandleFunc("/ListMyIdentitiesAndVerifiers", is.ListMyIdentitiesAndVerifiers)
+	public.HandleFunc("/ListSupportedIdentitiesAndVerifiers", is.middleware(is.listSupportedIdentitiesAndVerifiers))
+	public.HandleFunc("/CheckStatus", is.middleware(is.checkStatus))
+	public.HandleFunc("/StartSignIn", is.middleware(is.startSignIn))
+	public.HandleFunc("/StartSignUp", is.middleware(is.startSignUp))
+	public.HandleFunc("/StartAttach", is.middleware(is.startAttach))
+	public.HandleFunc("/CancelAuthentication", is.middleware(is.cancelAuthentication))
+	public.HandleFunc("/ListMyIdentitiesAndVerifiers", is.middleware(is.listMyIdentitiesAndVerifiers))
 	public.HandleFunc("/Start", is.middleware(is.start))
-	public.HandleFunc("/Verify", is.Verify)
-	public.HandleFunc("/Logout", is.Logout)
-	public.HandleFunc("/UserMerge", is.UserMerge)
+	public.HandleFunc("/Verify", is.middleware(is.verify))
+	public.HandleFunc("/Logout", is.middleware(is.logout))
+	public.HandleFunc("/UserMerge", is.middleware(is.userMerge))
 
 	private = http.NewServeMux()
-	private.HandleFunc("/LoginAs", is.LoginAs)
+	private.HandleFunc("/LoginAs", is.middleware(is.loginAs))
 
 	return
 }
@@ -146,56 +144,15 @@ func (is *IdentitySvc) start(ctx context.Context, requestData StartReq) (interfa
 	}, http.StatusOK
 }
 
-func (is *IdentitySvc) Start1(w http.ResponseWriter, q *http.Request) {
-	sess := is.sessionObtain(q.Context())
-
-	var requestData StartReq
-	if err := json.NewDecoder(q.Body).Decode(&requestData); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprint(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	ctx := q.Context()
-
-	for k, v := range requestData.Values {
-		ctx = context.WithValue(ctx, k, v)
-	}
-
-	directions, err := sess.Start(ctx, requestData.VerifierName, requestData.Args, requestData.IdentityName, requestData.Identity)
-	if err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	resp := &StartResp{
-		Directions: directions,
-	}
-
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-}
-
-func (is *IdentitySvc) listSupportedIdentitiesAndVerifiers() (result interface{}, err error) {
-
+func (is *IdentitySvc) listSupportedIdentitiesAndVerifiers(ctx context.Context) (interface{}, int) {
+	sess := is.sessionObtain(ctx)
 	resp := VerifierDetailsResp{}
 
 	idns, vers, err := sess.ListSupportedIdentitiesAndVerifiers()
 	if err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
 	for _, idn := range idns {
@@ -213,201 +170,126 @@ func (is *IdentitySvc) listSupportedIdentitiesAndVerifiers() (result interface{}
 		})
 	}
 
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	return resp, http.StatusOK
 }
 
-func (is *IdentitySvc) ListSupportedIdentitiesAndVerifiers1(w http.ResponseWriter, q *http.Request) {
-	sess := is.sessionObtain(q.Context())
-	resp := VerifierDetailsResp{}
+func (is *IdentitySvc) checkStatus(ctx context.Context) (interface{}, int) {
+	sess := is.sessionObtain(ctx)
 
-	idns, vers, err := sess.ListSupportedIdentitiesAndVerifiers()
+	resp, err := is.status(ctx, sess)
 	if err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
-	for _, idn := range idns {
-		resp.IdentityNames = append(resp.IdentityNames, idn.Name)
-	}
-
-	for _, ver := range vers {
-		resp.Verifiers = append(resp.Verifiers, &VerifierDetails{
-			Name:           ver.Name,
-			IdentityName:   ver.IdentityName,
-			SupportRegular: ver.SupportRegular,
-			SupportReverse: ver.SupportReverse,
-			SupportOAuth2:  ver.SupportOAuth2,
-			SupportStatic:  ver.SupportStatic,
-		})
-	}
-
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	return resp, http.StatusOK
 }
 
-func (is *IdentitySvc) CheckStatus(w http.ResponseWriter, q *http.Request) {
-	log.Println("*** CheckStatus ***")
-
-	sess := is.sessionObtain(q.Context())
-
-	log.Println("*** CheckStatus ***", fmt.Sprintln(sess.Info()))
-
-	if resp, err := is.status(q.Context(), sess); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-	} else if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-}
-
-func (is *IdentitySvc) StartSignIn(w http.ResponseWriter, q *http.Request) {
-	sess := is.sessionObtain(q.Context())
+func (is *IdentitySvc) startSignIn(ctx context.Context) (interface{}, int) {
+	sess := is.sessionObtain(ctx)
 
 	if _, uid := sess.Info(); uid != "" {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, "should be unauthenticated")
-		w.WriteHeader(http.StatusInternalServerError)
+		return ErrorResp{
+			Text: "should be unauthenticated",
+		}, http.StatusForbidden
 	}
 
-	if err := sess.StartAuthentication(q.Context(), identity.ObjectiveSignIn); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+	if err := sess.StartAuthentication(ctx, identity.ObjectiveSignIn); err != nil {
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
-	if resp, err := is.status(q.Context(), sess); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-	} else if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
+	resp, err := is.status(ctx, sess)
+	if err != nil {
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	return resp, http.StatusOK
 }
 
-func (is *IdentitySvc) StartSignUp(w http.ResponseWriter, q *http.Request) {
-	sess := is.sessionObtain(q.Context())
+func (is *IdentitySvc) startSignUp(ctx context.Context) (interface{}, int) {
+	sess := is.sessionObtain(ctx)
 
 	if _, uid := sess.Info(); uid != "" {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, "should be unauthenticated")
-		w.WriteHeader(http.StatusInternalServerError)
+		return ErrorResp{
+			Text: "should be unauthenticated",
+		}, http.StatusForbidden
 	}
 
-	if err := sess.StartAuthentication(q.Context(), identity.ObjectiveSignUp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+	if err := sess.StartAuthentication(ctx, identity.ObjectiveSignUp); err != nil {
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
-	if resp, err := is.status(q.Context(), sess); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-	} else if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
+	resp, err := is.status(ctx, sess)
+	if err != nil {
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	return resp, http.StatusOK
 }
 
-func (is *IdentitySvc) StartAttach(w http.ResponseWriter, q *http.Request) {
-	sess := is.sessionObtain(q.Context())
+func (is *IdentitySvc) startAttach(ctx context.Context) (interface{}, int) {
+	sess := is.sessionObtain(ctx)
 
 	if _, uid := sess.Info(); uid != "" {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, "unauthenticated")
-		w.WriteHeader(http.StatusInternalServerError)
+		return ErrorResp{
+			Text: "should be unauthenticated",
+		}, http.StatusForbidden
 	}
 
-	if err := sess.StartAuthentication(q.Context(), identity.ObjectiveAttach); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+	if err := sess.StartAuthentication(ctx, identity.ObjectiveAttach); err != nil {
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
-	if resp, err := is.status(q.Context(), sess); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-	} else if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
+	resp, err := is.status(ctx, sess)
+	if err != nil {
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	return resp, http.StatusOK
 }
 
-func (is *IdentitySvc) CancelAuthentication(w http.ResponseWriter, q *http.Request) {
-	sess := is.sessionObtain(q.Context())
+func (is *IdentitySvc) cancelAuthentication(ctx context.Context) (interface{}, int) {
+	sess := is.sessionObtain(ctx)
 
-	if err := sess.CancelAuthentication(q.Context()); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+	if err := sess.CancelAuthentication(ctx); err != nil {
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
-	if resp, err := is.status(q.Context(), sess); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-	} else if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
+	resp, err := is.status(ctx, sess)
+	if err != nil {
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	return resp, http.StatusOK
 }
 
-func (is *IdentitySvc) ListMyIdentitiesAndVerifiers(w http.ResponseWriter, q *http.Request) {
-	sess := is.sessionObtain(q.Context())
+func (is *IdentitySvc) listMyIdentitiesAndVerifiers(ctx context.Context) (interface{}, int) {
+	sess := is.sessionObtain(ctx)
 
 	resp := &ListMyIdentitiesAndVerifiersResp{}
 
-	idns, vers, err := sess.ListMyIdentitiesAndVerifiers(q.Context())
+	idns, vers, err := sess.ListMyIdentitiesAndVerifiers(ctx)
 	if err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
 	for _, ver := range vers {
@@ -422,77 +304,43 @@ func (is *IdentitySvc) ListMyIdentitiesAndVerifiers(w http.ResponseWriter, q *ht
 		})
 	}
 
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	return resp, http.StatusOK
 }
 
-func (is *IdentitySvc) Verify(w http.ResponseWriter, q *http.Request) {
-	sess := is.sessionObtain(q.Context())
+func (is *IdentitySvc) verify(ctx context.Context, requestData VerifyReq) (interface{}, int) {
+	sess := is.sessionObtain(ctx)
 
-	var requestData VerifyReq
-	if err := json.NewDecoder(q.Body).Decode(&requestData); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	verErr := sess.Verify(q.Context(), requestData.VerifierName, requestData.VerificationCode, requestData.IdentityName, requestData.Identity)
-
-	if stat, err := is.status(q.Context(), sess); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-	} else if err := json.NewEncoder(w).Encode(stat); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	q.Header.Set("Content-Type", "application/json")
-
+	verErr := sess.Verify(ctx, requestData.VerifierName, requestData.VerificationCode, requestData.IdentityName, requestData.Identity)
 	if verErr != nil {
 		//TODO ???  error: status.New(codes.InvalidArgument, verErr.Error()).Err()
-		w.WriteHeader(http.StatusBadRequest)
-	} else {
-		w.WriteHeader(http.StatusOK)
+		return ErrorResp{
+			Text: verErr.Error(),
+		}, http.StatusBadRequest
 	}
+
+	stat, err := is.status(ctx, sess)
+	if err != nil {
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
+	}
+
+	return stat, http.StatusOK
 }
 
-func (is *IdentitySvc) Logout(w http.ResponseWriter, q *http.Request) {
-	sess := is.sessionObtain(q.Context())
-
+func (is *IdentitySvc) logout(ctx context.Context) (interface{}, int) {
 	// TODO Also delete Authentication on logout
 
 	// TODO
 	panic("not implemented")
 
-	if resp, err := is.status(q.Context(), sess); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-	} else if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	return nil, 0
 }
 
-func (is *IdentitySvc) UserMerge(w http.ResponseWriter, q *http.Request) {
+func (is *IdentitySvc) userMerge(ctx context.Context) (interface{}, int) {
 	// TODO
 	panic("not implemented")
+	return nil, 0
 
 }
 
@@ -500,22 +348,14 @@ func (is *IdentitySvc) UserMerge(w http.ResponseWriter, q *http.Request) {
 //// PrivateAuthenticationService
 ////
 
-func (is *IdentitySvc) LoginAs(w http.ResponseWriter, q *http.Request) {
-	sess := is.sessionObtain(q.Context())
-
-	var requestData LoginAsReq
-	if err := json.NewDecoder(q.Body).Decode(&requestData); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
+func (is *IdentitySvc) loginAs(ctx context.Context, requestData LoginAsReq) (interface{}, int) {
+	sess := is.sessionObtain(ctx)
 
 	sid, err := sess.LoginAs(requestData.User)
 	if err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
 	}
 
 	resp := LoginAsResp{
@@ -523,15 +363,7 @@ func (is *IdentitySvc) LoginAs(w http.ResponseWriter, q *http.Request) {
 		Session: sid,
 	}
 
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		q.Header.Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
-		panic(err)
-	}
-
-	q.Header.Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	return resp, http.StatusOK
 }
 
 ////////////////////////////////////////////////////////////////
