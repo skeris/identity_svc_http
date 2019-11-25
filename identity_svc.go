@@ -139,7 +139,7 @@ func (is *IdentitySvc) start(ctx context.Context, requestData StartReq) (interfa
 		}, http.StatusInternalServerError
 	}
 
-	return &StartResp{
+	return StartResp{
 		Directions: directions,
 	}, http.StatusOK
 }
