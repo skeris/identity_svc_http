@@ -43,45 +43,45 @@ func New(backend identity.Backend, cookieCtxKey string, identities []identity.Id
 
 func (is *IdentitySvc) Register() (public, private *http.ServeMux) {
 	public = http.NewServeMux()
-	public.HandleFunc("/ListSupportedIdentitiesAndVerifiers", is.middleware(is.listSupportedIdentitiesAndVerifiers))
-	public.HandleFunc("/CheckStatus", is.middleware(is.checkStatus))
-	public.HandleFunc("/StartSignIn", is.middleware(is.startSignIn))
-	public.HandleFunc("/StartSignUp", is.middleware(is.startSignUp))
-	public.HandleFunc("/StartAttach", is.middleware(is.startAttach))
-	public.HandleFunc("/CancelAuthentication", is.middleware(is.cancelAuthentication))
-	public.HandleFunc("/ListMyIdentitiesAndVerifiers", is.middleware(is.listMyIdentitiesAndVerifiers))
-	public.HandleFunc("/Start", is.middleware(is.start))
-	public.HandleFunc("/Verify", is.middleware(is.verify))
-	public.HandleFunc("/Logout", is.middleware(is.logout))
-	public.HandleFunc("/UserMerge", is.middleware(is.userMerge))
+	public.HandleFunc("/ListSupportedIdentitiesAndVerifiers", is.universalHandler(is.listSupportedIdentitiesAndVerifiers))
+	public.HandleFunc("/CheckStatus", is.universalHandler(is.checkStatus))
+	public.HandleFunc("/StartSignIn", is.universalHandler(is.startSignIn))
+	public.HandleFunc("/StartSignUp", is.universalHandler(is.startSignUp))
+	public.HandleFunc("/StartAttach", is.universalHandler(is.startAttach))
+	public.HandleFunc("/CancelAuthentication", is.universalHandler(is.cancelAuthentication))
+	public.HandleFunc("/ListMyIdentitiesAndVerifiers", is.universalHandler(is.listMyIdentitiesAndVerifiers))
+	public.HandleFunc("/Start", is.universalHandler(is.start))
+	public.HandleFunc("/Verify", is.universalHandler(is.verify))
+	public.HandleFunc("/Logout", is.universalHandler(is.logout))
+	public.HandleFunc("/UserMerge", is.universalHandler(is.userMerge))
 
 	private = http.NewServeMux()
-	private.HandleFunc("/LoginAs", is.middleware(is.loginAs))
+	private.HandleFunc("/LoginAs", is.universalHandler(is.loginAs))
 
 	return
 }
 
-func (is *IdentitySvc) middleware(f interface{}) http.HandlerFunc {
-	fRefl := reflect.ValueOf(f)
-	fReflType := fRefl.Type()
+func (is *IdentitySvc) universalHandler(f interface{}) http.HandlerFunc {
+	fRV := reflect.ValueOf(f)
+	fRT := fRV.Type()
 
-	var argType reflect.Type
-	var argTypeRefl reflect.Value
+	var argRT reflect.Type
+	var argTypeRV reflect.Value
 	var argExist bool
 
-	if fReflType.NumIn() > 1 {
+	if fRT.NumIn() > 1 {
 		argExist = true
-		argType = fReflType.In(1)
-		argTypeRefl = reflect.New(argType)
+		argRT = fRT.In(1)
+		argTypeRV = reflect.New(argRT)
 	}
 
 	return func(w http.ResponseWriter, q *http.Request) {
 		q.Header.Set("Content-Type", "application/json")
 
-		var fResultRefl []reflect.Value
+		var fResultRV []reflect.Value
 
 		if argExist {
-			arg := argTypeRefl.Interface()
+			arg := argTypeRV.Interface()
 			if err := json.NewDecoder(q.Body).Decode(&arg); err != nil {
 				resp := ErrorResp{
 					Text: err.Error(),
@@ -91,14 +91,14 @@ func (is *IdentitySvc) middleware(f interface{}) http.HandlerFunc {
 					panic(err)
 				}
 			} else {
-				fResultRefl = fRefl.Call([]reflect.Value{reflect.ValueOf(q.Context()), reflect.ValueOf(arg)})
+				fResultRV = fRV.Call([]reflect.Value{reflect.ValueOf(q.Context()), reflect.ValueOf(arg)})
 			}
 		} else {
-			fResultRefl = fRefl.Call([]reflect.Value{reflect.ValueOf(q.Context())})
+			fResultRV = fRV.Call([]reflect.Value{reflect.ValueOf(q.Context())})
 		}
 
-		w.WriteHeader(fResultRefl[1].Interface().(int))
-		if err := json.NewEncoder(w).Encode(fResultRefl[0].Interface()); err != nil {
+		w.WriteHeader(fResultRV[1].Interface().(int))
+		if err := json.NewEncoder(w).Encode(fResultRV[0].Interface()); err != nil {
 			panic(err)
 		}
 	}
