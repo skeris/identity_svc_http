@@ -63,7 +63,7 @@ func (is *IdentitySvc) Register() (public, private *http.ServeMux) {
 }
 
 func (is *IdentitySvc) handlerWrapper(f interface{}) http.HandlerFunc {
-	fRV := reflect.ValueOf(f)
+	fRV := reflect.ValueOf(f).Elem()
 	fRT := fRV.Type()
 
 	var argRT reflect.Type
