@@ -78,7 +78,7 @@ func (is *IdentitySvc) handlerWrapper(f interface{}) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, q *http.Request) {
 		q.Header.Set("Content-Type", "application/json")
-
+		log.Println("handlerWrapper handlerWrapper 1")
 		var fResultRV []reflect.Value
 
 		if argExist {
@@ -129,19 +129,20 @@ func (is *IdentitySvc) status(ctx context.Context, sess *identity.Session) (*Sta
 }
 
 func (is *IdentitySvc) start(ctx context.Context, requestData StartReq) (interface{}, int) {
+	log.Println("IdentitySvc start 1")
 	sess := is.sessionObtain(ctx)
 
 	for k, v := range requestData.Values {
 		ctx = context.WithValue(ctx, k, v)
 	}
-
+	log.Println("IdentitySvc start 2")
 	directions, err := sess.Start(ctx, requestData.VerifierName, requestData.Args, requestData.IdentityName, requestData.Identity)
 	if err != nil {
 		return ErrorResp{
 			Text: err.Error(),
 		}, http.StatusInternalServerError
 	}
-
+	log.Println("IdentitySvc start 3")
 	return StartResp{
 		Directions: directions,
 	}, http.StatusOK
