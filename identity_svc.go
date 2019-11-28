@@ -63,7 +63,7 @@ func (is *IdentitySvc) Register() (public, private *http.ServeMux) {
 }
 
 func (is *IdentitySvc) handlerWrapper(f interface{}) http.HandlerFunc {
-	fRV := reflect.ValueOf(f).Elem()
+	fRV := reflect.ValueOf(f)
 	fRT := fRV.Type()
 
 	var argRT reflect.Type
@@ -78,7 +78,6 @@ func (is *IdentitySvc) handlerWrapper(f interface{}) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, q *http.Request) {
 		q.Header.Set("Content-Type", "application/json")
-		log.Println("handlerWrapper handlerWrapper 1")
 		var fResultRV []reflect.Value
 
 		if argExist {
@@ -92,11 +91,9 @@ func (is *IdentitySvc) handlerWrapper(f interface{}) http.HandlerFunc {
 					panic(err)
 				}
 			} else {
-				log.Print("handlerWrapper before call 1 fRV ", fRV)
-				fResultRV = fRV.Call([]reflect.Value{reflect.ValueOf(q.Context()), reflect.ValueOf(arg)})
+				fResultRV = fRV.Call([]reflect.Value{reflect.ValueOf(q.Context()), reflect.ValueOf(arg).Elem()})
 			}
 		} else {
-			log.Print("handlerWrapper before call 2")
 			fResultRV = fRV.Call([]reflect.Value{reflect.ValueOf(q.Context())})
 		}
 
