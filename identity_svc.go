@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/themakers/identity/cookie"
 	"github.com/themakers/identity/identity"
+	"log"
 	"net/http"
 	"encoding/json"
 	"reflect"
@@ -43,25 +44,25 @@ func New(backend identity.Backend, cookieCtxKey string, identities []identity.Id
 
 func (is *IdentitySvc) Register() (public, private *http.ServeMux) {
 	public = http.NewServeMux()
-	public.HandleFunc("/ListSupportedIdentitiesAndVerifiers", is.universalHandler(is.listSupportedIdentitiesAndVerifiers))
-	public.HandleFunc("/CheckStatus", is.universalHandler(is.checkStatus))
-	public.HandleFunc("/StartSignIn", is.universalHandler(is.startSignIn))
-	public.HandleFunc("/StartSignUp", is.universalHandler(is.startSignUp))
-	public.HandleFunc("/StartAttach", is.universalHandler(is.startAttach))
-	public.HandleFunc("/CancelAuthentication", is.universalHandler(is.cancelAuthentication))
-	public.HandleFunc("/ListMyIdentitiesAndVerifiers", is.universalHandler(is.listMyIdentitiesAndVerifiers))
-	public.HandleFunc("/Start", is.universalHandler(is.start))
-	public.HandleFunc("/Verify", is.universalHandler(is.verify))
-	public.HandleFunc("/Logout", is.universalHandler(is.logout))
-	public.HandleFunc("/UserMerge", is.universalHandler(is.userMerge))
+	public.HandleFunc("/ListSupportedIdentitiesAndVerifiers", is.handlerWrapper(is.listSupportedIdentitiesAndVerifiers))
+	public.HandleFunc("/CheckStatus", is.handlerWrapper(is.checkStatus))
+	public.HandleFunc("/StartSignIn", is.handlerWrapper(is.startSignIn))
+	public.HandleFunc("/StartSignUp", is.handlerWrapper(is.startSignUp))
+	public.HandleFunc("/StartAttach", is.handlerWrapper(is.startAttach))
+	public.HandleFunc("/CancelAuthentication", is.handlerWrapper(is.cancelAuthentication))
+	public.HandleFunc("/ListMyIdentitiesAndVerifiers", is.handlerWrapper(is.listMyIdentitiesAndVerifiers))
+	public.HandleFunc("/Start", is.handlerWrapper(is.start))
+	public.HandleFunc("/Verify", is.handlerWrapper(is.verify))
+	public.HandleFunc("/Logout", is.handlerWrapper(is.logout))
+	public.HandleFunc("/UserMerge", is.handlerWrapper(is.userMerge))
 
 	private = http.NewServeMux()
-	private.HandleFunc("/LoginAs", is.universalHandler(is.loginAs))
+	private.HandleFunc("/LoginAs", is.handlerWrapper(is.loginAs))
 
 	return
 }
 
-func (is *IdentitySvc) universalHandler(f interface{}) http.HandlerFunc {
+func (is *IdentitySvc) handlerWrapper(f interface{}) http.HandlerFunc {
 	fRV := reflect.ValueOf(f)
 	fRT := fRV.Type()
 
@@ -91,9 +92,11 @@ func (is *IdentitySvc) universalHandler(f interface{}) http.HandlerFunc {
 					panic(err)
 				}
 			} else {
+				log.Print("handlerWrapper before call 1")
 				fResultRV = fRV.Call([]reflect.Value{reflect.ValueOf(q.Context()), reflect.ValueOf(arg)})
 			}
 		} else {
+			log.Print("handlerWrapper before call 2")
 			fResultRV = fRV.Call([]reflect.Value{reflect.ValueOf(q.Context())})
 		}
 
