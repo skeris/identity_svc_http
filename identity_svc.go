@@ -92,7 +92,7 @@ func (is *IdentitySvc) handlerWrapper(f interface{}) http.HandlerFunc {
 					panic(err)
 				}
 			} else {
-				log.Print("handlerWrapper before call 1")
+				log.Print("handlerWrapper before call 1 fRV ", fRV)
 				fResultRV = fRV.Call([]reflect.Value{reflect.ValueOf(q.Context()), reflect.ValueOf(arg)})
 			}
 		} else {
