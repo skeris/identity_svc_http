@@ -172,14 +172,12 @@ func (is *IdentitySvc) listSupportedIdentitiesAndVerifiers(ctx context.Context) 
 
 func (is *IdentitySvc) checkStatus(ctx context.Context) (interface{}, int) {
 	sess := is.sessionObtain(ctx)
-
 	resp, err := is.status(ctx, sess)
 	if err != nil {
 		return ErrorResp{
 			Text: err.Error(),
 		}, http.StatusInternalServerError
 	}
-
 	return resp, http.StatusOK
 }
 

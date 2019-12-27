@@ -18,7 +18,7 @@ type Status struct {
 	Token string `json:"Token"`
 
 	Authenticating *StatusAuthenticating `json:"Authenticating"`
-	Authenticated  *StatusAuthenticated  `json:"Authenticating"`
+	Authenticated  *StatusAuthenticated  `json:"Authenticated"`
 }
 type StatusAuthenticating struct {
 	Objective        string                   `json:"Objective"`
