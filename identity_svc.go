@@ -324,12 +324,16 @@ func (is *IdentitySvc) verify(ctx context.Context, requestData VerifyReq) (inter
 }
 
 func (is *IdentitySvc) logout(ctx context.Context) (interface{}, int) {
-	// TODO Also delete Authentication on logout
+	sess := is.sessionObtain(ctx)
 
-	// TODO
-	panic("not implemented")
+	stat, err := sess.Logout(ctx)
+	if err != nil {
+		return ErrorResp{
+			Text: err.Error(),
+		}, http.StatusInternalServerError
+	}
 
-	return nil, 0
+	return stat, http.StatusOK
 }
 
 func (is *IdentitySvc) userMerge(ctx context.Context) (interface{}, int) {
