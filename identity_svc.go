@@ -3,8 +3,8 @@ package identity_svc_http
 import (
 	"context"
 	"encoding/json"
-	"github.com/themakers/identity/cookie"
-	"github.com/themakers/identity/identity"
+	"github.com/skeris/identity/cookie"
+	"github.com/skeris/identity/identity"
 	"net/http"
 	"reflect"
 )
