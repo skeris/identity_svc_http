@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/skeris/identity/cookie"
 	"github.com/skeris/identity/identity"
+	"github.com/skeris/identity/errors"
 	"net/http"
 	"reflect"
 )
@@ -132,9 +133,16 @@ func (is *IdentitySvc) start(ctx context.Context, requestData StartReq) (interfa
 	}
 	directions, err := sess.Start(ctx, requestData.VerifierName, requestData.Args, requestData.IdentityName, requestData.Identity)
 	if err != nil {
+		var status int
+		switch err.(type) {
+		case errors.ErrorAlreadyRegistered:
+			status = http.StatusConflict
+		default:
+			status = http.StatusInternalServerError
+		}
 		return ErrorResp{
 			Text: err.Error(),
-		}, http.StatusInternalServerError
+		}, status
 	}
 	return StartResp{
 		Directions: directions,
