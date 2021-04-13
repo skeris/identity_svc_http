@@ -129,6 +129,8 @@ func (is *IdentitySvc) status(ctx context.Context, sess *identity.Session) (*Sta
 }
 
 func (is *IdentitySvc) start(ctx context.Context, requestData StartReq) (interface{}, int) {
+
+	fmt.Println("STINGO")
 	sess := is.sessionObtain(ctx)
 
 	for k, v := range requestData.Values {
