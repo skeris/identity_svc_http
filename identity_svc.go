@@ -85,6 +85,7 @@ fmt.Println("AASTINGO")
 		if argExist {
 			arg := argTypeRV.Interface()
 			if err := json.NewDecoder(q.Body).Decode(&arg); err != nil {
+				fmt.Println("AAST", q.Body)
 				resp := ErrorResp{
 					Text: err.Error(),
 				}
