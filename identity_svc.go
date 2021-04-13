@@ -3,9 +3,10 @@ package identity_svc_http
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/skeris/identity/cookie"
-	"github.com/skeris/identity/identity"
 	"github.com/skeris/identity/errors"
+	"github.com/skeris/identity/identity"
 	"net/http"
 	"reflect"
 )
@@ -77,9 +78,10 @@ func (is *IdentitySvc) handlerWrapper(f interface{}) http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, q *http.Request) {
+		fmt.Println("AASTINGO111")
 		q.Header.Set("Content-Type", "application/json")
 		var fResultRV []reflect.Value
-
+fmt.Println("AASTINGO")
 		if argExist {
 			arg := argTypeRV.Interface()
 			if err := json.NewDecoder(q.Body).Decode(&arg); err != nil {
@@ -96,6 +98,7 @@ func (is *IdentitySvc) handlerWrapper(f interface{}) http.HandlerFunc {
 		} else {
 			fResultRV = fRV.Call([]reflect.Value{reflect.ValueOf(q.Context())})
 		}
+		fmt.Println("AASTINGO1")
 
 		w.WriteHeader(fResultRV[1].Interface().(int))
 		if err := json.NewEncoder(w).Encode(fResultRV[0].Interface()); err != nil {
