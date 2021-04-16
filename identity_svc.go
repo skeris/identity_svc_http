@@ -329,7 +329,7 @@ func (is *IdentitySvc) verify(ctx context.Context, requestData VerifyReq) (inter
 	sess := is.sessionObtain(ctx)
 
 	verErr := sess.Verify(
-		ctx, requestData.VerifierName, requestData.VerificationCode, requestData.IdentityName, requestData.Identity)
+		ctx, requestData.VerifierName, requestData.VerificationCode, requestData.IdentityName, requestData.Identity,is.logger)
 	if verErr != nil {
 		//TODO ???  error: status.New(codes.InvalidArgument, verErr.Error()).Err()
 		return ErrorResp{
