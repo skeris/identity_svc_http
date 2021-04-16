@@ -7,6 +7,7 @@ import (
 	"github.com/skeris/identity/cookie"
 	"github.com/skeris/identity/errors"
 	"github.com/skeris/identity/identity"
+	"github.com/themakers/hlog"
 	"net/http"
 	"reflect"
 )
@@ -23,11 +24,19 @@ const (
 type IdentitySvc struct {
 	cookieCtxKey string
 	mgr          *identity.Manager
+	logger hlog.Logger
 }
 
-func New(backend identity.Backend, cookieCtxKey string, identities []identity.Identity, verifiers []identity.Verifier) (*IdentitySvc, error) {
+func New(
+	backend identity.Backend,
+	cookieCtxKey string,
+	identities []identity.Identity,
+	verifiers []identity.Verifier,
+	log hlog.Logger,
+	) (*IdentitySvc, error) {
 	is := &IdentitySvc{
 		cookieCtxKey: cookieCtxKey,
+		logger: log,
 	}
 
 	if mgr, err := identity.New(
@@ -319,7 +328,8 @@ func (is *IdentitySvc) listMyIdentitiesAndVerifiers(ctx context.Context) (interf
 func (is *IdentitySvc) verify(ctx context.Context, requestData VerifyReq) (interface{}, int) {
 	sess := is.sessionObtain(ctx)
 
-	verErr := sess.Verify(ctx, requestData.VerifierName, requestData.VerificationCode, requestData.IdentityName, requestData.Identity)
+	verErr := sess.Verify(
+		ctx, requestData.VerifierName, requestData.VerificationCode, requestData.IdentityName, requestData.Identity)
 	if verErr != nil {
 		//TODO ???  error: status.New(codes.InvalidArgument, verErr.Error()).Err()
 		return ErrorResp{
