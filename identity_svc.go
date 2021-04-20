@@ -3,7 +3,6 @@ package identity_svc_http
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/skeris/identity/cookie"
 	"github.com/skeris/identity/errors"
 	"github.com/skeris/identity/identity"
@@ -87,14 +86,11 @@ func (is *IdentitySvc) handlerWrapper(f interface{}) http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, q *http.Request) {
-		fmt.Println("AASTINGO111")
 		q.Header.Set("Content-Type", "application/json")
 		var fResultRV []reflect.Value
-fmt.Println("AASTINGO")
 		if argExist {
 			arg := argTypeRV.Interface()
 			if err := json.NewDecoder(q.Body).Decode(&arg); err != nil {
-				fmt.Println("AAST", q.Body)
 				resp := ErrorResp{
 					Text: err.Error(),
 				}
@@ -108,7 +104,6 @@ fmt.Println("AASTINGO")
 		} else {
 			fResultRV = fRV.Call([]reflect.Value{reflect.ValueOf(q.Context())})
 		}
-		fmt.Println("AASTINGO1")
 
 		w.WriteHeader(fResultRV[1].Interface().(int))
 		if err := json.NewEncoder(w).Encode(fResultRV[0].Interface()); err != nil {
@@ -140,7 +135,6 @@ func (is *IdentitySvc) status(ctx context.Context, sess *identity.Session) (*Sta
 
 func (is *IdentitySvc) start(ctx context.Context, requestData StartReq) (interface{}, int) {
 
-	fmt.Println("STINGO")
 	sess := is.sessionObtain(ctx)
 
 	for k, v := range requestData.Values {
@@ -257,9 +251,9 @@ func (is *IdentitySvc) startSignUp(ctx context.Context) (interface{}, int) {
 func (is *IdentitySvc) startAttach(ctx context.Context) (interface{}, int) {
 	sess := is.sessionObtain(ctx)
 
-	if _, uid := sess.Info(); uid != "" {
+	if _, uid := sess.Info(); uid == "" {
 		return ErrorResp{
-			Text: "should be unauthenticated",
+			Text: "should be authenticated",
 		}, http.StatusForbidden
 	}
 
