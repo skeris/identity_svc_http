@@ -3,6 +3,8 @@ package identity_svc_http
 import (
 	"context"
 	"encoding/json"
+	"github.com/skeris/authService/hlogged"
+	"github.com/skeris/authService/http_middleware"
 	"github.com/skeris/identity/cookie"
 	"github.com/skeris/identity/errors"
 	"github.com/skeris/identity/identity"
@@ -343,6 +345,20 @@ func (is *IdentitySvc) verify(ctx context.Context, requestData VerifyReq) (inter
 
 func (is *IdentitySvc) logout(ctx context.Context) (interface{}, int) {
 	sess := is.sessionObtain(ctx)
+
+	_, uid := sess.Info()
+
+	headers := ctx.Value(http_middleware.AddDataKey).(map[string]string)
+
+	is.logger.Emit(hlogged.InfoUserLogout{
+		CtxUser: uid,
+
+		CtxPartner: headers["partner"],
+		CtxFingerprint: headers["fingerprint"],
+		CtxLink: headers["link"],
+		CtxRealIP: headers["originalIP"],
+		CtxForwardedIP: headers["forwardedIP"],
+	})
 
 	stat, err := sess.Logout(ctx)
 	if err != nil {
