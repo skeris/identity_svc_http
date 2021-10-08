@@ -203,11 +203,11 @@ func (is *IdentitySvc) checkStatus(ctx context.Context) (interface{}, int) {
 func (is *IdentitySvc) startSignIn(ctx context.Context) (interface{}, int) {
 	sess := is.sessionObtain(ctx)
 
-	if _, uid := sess.Info(); uid != "" {
-		return ErrorResp{
-			Text: "should be unauthenticated",
-		}, http.StatusForbidden
-	}
+	//if _, uid := sess.Info(); uid != "" {
+	//	return ErrorResp{
+	//		Text: "should be unauthenticated",
+	//	}, http.StatusForbidden
+	//}
 
 	if err := sess.StartAuthentication(ctx, identity.ObjectiveSignIn); err != nil {
 		return ErrorResp{
