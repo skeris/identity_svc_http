@@ -354,7 +354,8 @@ func (is *IdentitySvc) logout(ctx context.Context) (interface{}, int) {
 		CtxUser: uid,
 
 		CtxPartner: headers["partner"],
-		CtxFingerprint: headers["fingerprint"],
+		CtxFingerprint: headers["ShortFP"],
+		CtxDevice: headers["LongFP"],
 		CtxLink: headers["link"],
 		CtxRealIP: headers["originalIP"],
 		CtxForwardedIP: headers["forwardedIP"],
