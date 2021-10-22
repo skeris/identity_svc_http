@@ -131,6 +131,15 @@ func (is *IdentitySvc) status(ctx context.Context, sess *identity.Session) (*Sta
 	if status, err := sess.CheckStatus(ctx); err != nil {
 		return &Status{}, err
 	} else {
+		headers := ctx.Value("headers").(map[string]string)
+		is.logger.Emit(hlogged.InfoVisit{
+			CtxPartner: headers["partner"],
+			CtxFingerprint: headers["ShortFP"],
+			CtxDevice: headers["LongFP"],
+			CtxLink: headers["link"],
+			CtxRealIP: headers["originalIP"],
+			CtxForwardedIP: headers["forwardedIP"],
+		})
 		return convertStatus(status), nil
 	}
 }
