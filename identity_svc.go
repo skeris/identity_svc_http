@@ -3,6 +3,7 @@ package identity_svc_http
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/skeris/authService/hlogged"
 	"github.com/skeris/authService/http_middleware"
 	"github.com/skeris/identity/cookie"
@@ -203,11 +204,11 @@ func (is *IdentitySvc) checkStatus(ctx context.Context) (interface{}, int) {
 func (is *IdentitySvc) startSignIn(ctx context.Context) (interface{}, int) {
 	sess := is.sessionObtain(ctx)
 
-	//if _, uid := sess.Info(); uid != "" {
-	//	return ErrorResp{
-	//		Text: "should be unauthenticated",
-	//	}, http.StatusForbidden
-	//}
+	if _, uid := sess.Info(); uid != "" {
+		return ErrorResp{
+			Text: "should be unauthenticated",
+		}, http.StatusForbidden
+	}
 
 	if err := sess.StartAuthentication(ctx, identity.ObjectiveSignIn); err != nil {
 		return ErrorResp{
@@ -322,6 +323,7 @@ func (is *IdentitySvc) listMyIdentitiesAndVerifiers(ctx context.Context) (interf
 }
 
 func (is *IdentitySvc) verify(ctx context.Context, requestData VerifyReq) (interface{}, int) {
+	fmt.Println("requestData", requestData)
 	sess := is.sessionObtain(ctx)
 
 	verErr := sess.Verify(
